@@ -12,19 +12,76 @@ import { useState, useEffect } from 'react';
 
 const serverUrl = 'https://livekit.matejkokol.eu';
 
-// Token Input Dialog Component
-function TokenDialog({ isOpen, onSubmit }) {
-  const [token, setToken] = useState('');
+// Login Dialog Component
+function LoginDialog({ isOpen, onSubmit }) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!token.trim()) {
-      setError('Please enter a valid token');
+    
+    if (!email.trim() || !password.trim()) {
+      setError('Please enter both email and password');
       return;
     }
+
     setError('');
-    onSubmit(token.trim());
+    setIsLoading(true);
+
+    try {
+      // Step 1: Login to get access token
+      const loginResponse = await fetch('https://server.heyme.uk/api/ui/v1/users/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: email.trim(),
+          password: password.trim(),
+        }),
+      });
+
+      if (!loginResponse.ok) {
+        throw new Error(`Login failed: ${loginResponse.status} ${loginResponse.statusText}`);
+      }
+
+      const loginData = await loginResponse.json();
+      const accessToken = loginData.data.access_token;
+
+      if (!accessToken) {
+        throw new Error('No access token received from login');
+      }
+
+      // Step 2: Get LiveKit token using access token
+      const meetResponse = await fetch('https://server.heyme.uk/api/ui/v1/meetings/public', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!meetResponse.ok) {
+        throw new Error(`Failed to get LiveKit token: ${meetResponse.status} ${meetResponse.statusText}`);
+      }
+
+      const meetData = await meetResponse.json();
+      
+      if (!meetData.success || !meetData.data) {
+        throw new Error('Failed to get LiveKit token from response');
+      }
+
+      // Success! Pass the LiveKit token to the parent component
+      onSubmit(meetData.data);
+
+    } catch (err) {
+      console.error('Authentication error:', err);
+      setError(err.message || 'Authentication failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -48,49 +105,81 @@ function TokenDialog({ isOpen, onSubmit }) {
         borderRadius: '8px',
         boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
         width: '90%',
-        maxWidth: '500px'
+        maxWidth: '400px'
       }}>
-        <h2 style={{ marginTop: 0, marginBottom: '1rem' }}>Enter LiveKit Token</h2>
+        <h2 style={{ marginTop: 0, marginBottom: '1.5rem', textAlign: 'center' }}>Login to HeyMe</h2>
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: '1rem' }}>
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
-              Token:
+              Email:
             </label>
-            <textarea
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              placeholder="Paste your LiveKit token here..."
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Enter your email"
               style={{
                 width: '100%',
-                minHeight: '100px',
-                padding: '0.5rem',
+                padding: '0.75rem',
                 border: '1px solid #ccc',
                 borderRadius: '4px',
-                fontFamily: 'monospace',
-                fontSize: '12px',
-                resize: 'vertical'
+                fontSize: '14px'
               }}
               autoFocus
+              disabled={isLoading}
             />
           </div>
+          
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+              Password:
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter your password"
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: '1px solid #ccc',
+                borderRadius: '4px',
+                fontSize: '14px'
+              }}
+              disabled={isLoading}
+            />
+          </div>
+          
           {error && (
-            <div style={{ color: 'red', marginBottom: '1rem', fontSize: '14px' }}>
+            <div style={{ 
+              color: 'red', 
+              marginBottom: '1rem', 
+              fontSize: '14px',
+              padding: '0.5rem',
+              backgroundColor: '#ffebee',
+              border: '1px solid #ffcdd2',
+              borderRadius: '4px'
+            }}>
               {error}
             </div>
           )}
+          
           <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
             <button
               type="submit"
+              disabled={isLoading}
               style={{
-                backgroundColor: '#007bff',
+                backgroundColor: isLoading ? '#ccc' : '#007bff',
                 color: 'white',
                 border: 'none',
-                padding: '0.5rem 1rem',
+                padding: '0.75rem 1.5rem',
                 borderRadius: '4px',
-                cursor: 'pointer'
+                cursor: isLoading ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                fontWeight: 'bold'
               }}
             >
-              Connect
+              {isLoading ? 'Connecting...' : 'Login & Connect'}
             </button>
           </div>
         </form>
@@ -107,32 +196,32 @@ export default function App() {
     dynacast: true,
   }));
   
-  const [userToken, setUserToken] = useState('');
-  const [showTokenDialog, setShowTokenDialog] = useState(true);
+  const [livekitToken, setLivekitToken] = useState('');
+  const [showLoginDialog, setShowLoginDialog] = useState(true);
   const [isConnected, setIsConnected] = useState(false);
 
-  const handleTokenSubmit = (token) => {
-    setUserToken(token);
-    setShowTokenDialog(false);
+  const handleLoginSuccess = (token) => {
+    setLivekitToken(token);
+    setShowLoginDialog(false);
   };
 
-  // Connect to room when token is provided
+  // Connect to room when LiveKit token is provided
   useEffect(() => {
-    if (!userToken) return;
+    if (!livekitToken) return;
     
     let mounted = true;
     
     const connect = async () => {
       try {
         if (mounted) {
-          await room.connect(serverUrl, userToken);
+          await room.connect(serverUrl, livekitToken);
           setIsConnected(true);
         }
       } catch (error) {
         console.error('Failed to connect to room:', error);
-        // Show token dialog again if connection fails
-        setShowTokenDialog(true);
-        setUserToken('');
+        // Show login dialog again if connection fails
+        setShowLoginDialog(true);
+        setLivekitToken('');
       }
     };
     
@@ -143,13 +232,13 @@ export default function App() {
       room.disconnect();
       setIsConnected(false);
     };
-  }, [room, userToken]);
+  }, [room, livekitToken]);
 
   return (
     <>
-      <TokenDialog 
-        isOpen={showTokenDialog} 
-        onSubmit={handleTokenSubmit} 
+      <LoginDialog 
+        isOpen={showLoginDialog} 
+        onSubmit={handleLoginSuccess} 
       />
       
       {isConnected && (
