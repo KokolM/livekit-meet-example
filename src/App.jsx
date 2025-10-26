@@ -10,7 +10,7 @@ import { Room, Track } from 'livekit-client';
 import '@livekit/components-styles';
 import { useState, useEffect } from 'react';
 
-const serverUrl = 'https://livekit.matejkokol.eu';
+const serverUrl = 'https://livekit.heyme.uk';
 
 // Login Dialog Component
 function LoginDialog({ isOpen, onSubmit }) {
