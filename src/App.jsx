@@ -16,12 +16,27 @@ const serverUrl = 'https://livekit.heyme.uk';
 function LoginDialog({ isOpen, onSubmit }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [livekitToken, setLivekitToken] = useState('');
+  const [authMode, setAuthMode] = useState('credentials'); // 'credentials' or 'token'
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    if (authMode === 'token') {
+      // Direct LiveKit token authentication
+      if (!livekitToken.trim()) {
+        setError('Please enter a LiveKit token');
+        return;
+      }
+      
+      setError('');
+      onSubmit(livekitToken.trim());
+      return;
+    }
+    
+    // Email/Password authentication (existing logic)
     if (!email.trim() || !password.trim()) {
       setError('Please enter both email and password');
       return;
@@ -108,47 +123,119 @@ function LoginDialog({ isOpen, onSubmit }) {
         maxWidth: '400px'
       }}>
         <h2 style={{ marginTop: 0, marginBottom: '1.5rem', textAlign: 'center' }}>Login to HeyMe</h2>
+        
+        {/* Authentication Mode Toggle */}
+        <div style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
+          <div style={{ display: 'inline-flex', backgroundColor: '#f5f5f5', borderRadius: '6px', padding: '4px' }}>
+            <button
+              type="button"
+              onClick={() => setAuthMode('credentials')}
+              style={{
+                padding: '0.5rem 1rem',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                backgroundColor: authMode === 'credentials' ? '#007bff' : 'transparent',
+                color: authMode === 'credentials' ? 'white' : '#666',
+                transition: 'all 0.2s'
+              }}
+            >
+              Email & Password
+            </button>
+            <button
+              type="button"
+              onClick={() => setAuthMode('token')}
+              style={{
+                padding: '0.5rem 1rem',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                backgroundColor: authMode === 'token' ? '#007bff' : 'transparent',
+                color: authMode === 'token' ? 'white' : '#666',
+                transition: 'all 0.2s'
+              }}
+            >
+              LiveKit Token
+            </button>
+          </div>
+        </div>
+
         <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
-              Email:
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter your email"
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #ccc',
-                borderRadius: '4px',
-                fontSize: '14px'
-              }}
-              autoFocus
-              disabled={isLoading}
-            />
-          </div>
-          
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
-              Password:
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #ccc',
-                borderRadius: '4px',
-                fontSize: '14px'
-              }}
-              disabled={isLoading}
-            />
-          </div>
+          {authMode === 'credentials' ? (
+            <>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                  Email:
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your email"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #ccc',
+                    borderRadius: '4px',
+                    fontSize: '14px',
+                    boxSizing: 'border-box'
+                  }}
+                  autoFocus
+                  disabled={isLoading}
+                />
+              </div>
+              
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                  Password:
+                </label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #ccc',
+                    borderRadius: '4px',
+                    fontSize: '14px',
+                    boxSizing: 'border-box'
+                  }}
+                  disabled={isLoading}
+                />
+              </div>
+            </>
+          ) : (
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                LiveKit Token:
+              </label>
+              <textarea
+                value={livekitToken}
+                onChange={(e) => setLivekitToken(e.target.value)}
+                placeholder="Paste your LiveKit token here..."
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                  fontSize: '14px',
+                  resize: 'vertical',
+                  minHeight: '100px',
+                  fontFamily: 'monospace',
+                  boxSizing: 'border-box'
+                }}
+                autoFocus
+                disabled={isLoading}
+              />
+              <div style={{ fontSize: '12px', color: '#666', marginTop: '0.5rem' }}>
+                Enter a valid LiveKit access token to connect directly to the room.
+              </div>
+            </div>
+          )}
           
           {error && (
             <div style={{ 
@@ -179,7 +266,12 @@ function LoginDialog({ isOpen, onSubmit }) {
                 fontWeight: 'bold'
               }}
             >
-              {isLoading ? 'Connecting...' : 'Login & Connect'}
+              {isLoading 
+                ? 'Connecting...' 
+                : authMode === 'token' 
+                  ? 'Connect with Token' 
+                  : 'Login & Connect'
+              }
             </button>
           </div>
         </form>
